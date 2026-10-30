@@ -1,0 +1,829 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="theme-color" content="#164500">
+    <title>АгроСенс</title>
+    <link rel="manifest" href="manifest.json">
+    <link rel="icon" href="https://cdn-icons-png.flaticon.com/512/2913/2913520.png">
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <style>
+        :root { --bg: #F3FFEE; --primary: #164500; --text: #1a1a1a; --radius: 24px; }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: var(--bg); color: var(--text); line-height: 1.6; }
+        
+        /* ШАПКА */
+        header { background: var(--primary); color: var(--bg); padding: 1rem 2rem; display: flex; justify-content: space-between; align-items: center; position: sticky; top: 0; z-index: 1000; box-shadow: 0 4px 12px rgba(22, 69, 0, 0.2); }
+        .logo { font-size: 1.5rem; font-weight: bold; cursor: pointer; }
+        .hamburger { font-size: 1.8rem; cursor: pointer; position: relative; }
+        .menu-dropdown { display: none; position: absolute; top: 100%; right: 0; background: white; border-radius: 12px; box-shadow: 0 5px 20px rgba(0,0,0,0.2); min-width: 300px; margin-top: 10px; z-index: 2000; color: var(--text); max-height: 70vh; overflow-y: auto; }
+        .menu-dropdown.show { display: block; }
+        .menu-item { padding: 1rem; border-bottom: 1px solid #eee; }
+        .menu-item:last-child { border-bottom: none; }
+        .menu-label { font-size: 0.85rem; color: #666; margin-bottom: 0.3rem; }
+        .menu-value { font-weight: bold; color: var(--primary); margin-bottom: 0.5rem; }
+        
+        /* СТЕППЕР */
+        .stepper { display: flex; align-items: center; justify-content: center; padding: 1rem; background: rgba(22, 69, 0, 0.05); border-bottom: 1px solid rgba(22, 69, 0, 0.1); }
+        .step { opacity: 0.3; transition: opacity 0.3s; }
+        .step.active { opacity: 1; }
+        .step-icon { width: 36px; height: 36px; border-radius: 50%; background: var(--primary); color: white; display: flex; align-items: center; justify-content: center; margin: 0 auto; font-size: 1.2rem; }
+        .step-connector { width: 40px; height: 2px; background: var(--primary); opacity: 0.3; margin: 0 0.5rem; }
+        .step-connector.active { opacity: 1; }
+        
+        /* ЭКРАНЫ */
+        .screen { display: none; animation: fadeIn 0.3s; }
+        .screen.active { display: block; }
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+        
+        /* ГЛАВНЫЙ ЭКРАН */
+        .hero { height: 50vh; display: flex; flex-direction: column; justify-content: center; align-items: center; text-align: center; padding: 2rem; }
+        .hero-title { font-size: 4rem; font-weight: 800; color: var(--primary); font-family: 'Georgia', serif; margin-bottom: 1rem; }
+        .hero-subtitle { font-size: 1.2rem; color: #4a6b40; max-width: 600px; }
+        .scroll-hint { margin-top: 2rem; font-size: 2rem; color: var(--primary); animation: bounce 2s infinite; }
+        @keyframes bounce { 0%, 100% {transform: translateY(0);} 50% {transform: translateY(-10px);} }
+        
+        .cards-container { padding: 2rem; max-width: 1000px; margin: 0 auto; }
+        .choice-card { position: sticky; height: 60vh; min-height: 400px; border-radius: var(--radius); overflow: hidden; display: flex; flex-direction: column; justify-content: flex-end; padding: 2.5rem; margin-bottom: 3rem; box-shadow: 0 10px 30px rgba(0,0,0,0.15); }
+        .choice-card.bg-1 { background: linear-gradient(135deg, #2d5016, #6ba33e); top: 80px; z-index: 10; }
+        .choice-card.bg-2 { background: linear-gradient(135deg, #1a3d0a, #5a8f32); top: 100px; z-index: 20; }
+        .card-title { color: white; font-size: 2.2rem; font-weight: bold; margin-bottom: 0.8rem; }
+        .card-desc { color: #e8f5e9; font-size: 1.05rem; margin-bottom: 1.5rem; }
+        .btn-start { background: white; color: var(--primary); border: none; padding: 0.9rem 2rem; font-size: 1.05rem; font-weight: bold; border-radius: 50px; cursor: pointer; width: fit-content; transition: transform 0.2s; }
+        .btn-start:hover { transform: scale(1.05); }
+        
+        /* ФОРМЫ */
+        .form-container { max-width: 900px; margin: 2rem auto; padding: 1.5rem; }
+        h1 { color: var(--primary); margin-bottom: 1.5rem; text-align: center; font-size: 1.8rem; }
+        .form-group { margin-bottom: 1.5rem; }
+        .form-group label { display: block; margin-bottom: 0.5rem; color: var(--primary); font-weight: 600; font-size: 1.05rem; }
+        .form-group select, .form-group input { width: 100%; padding: 0.9rem; border: 2px solid #d4edda; border-radius: 12px; font-size: 1rem; background: white; }
+        
+        .ph-scale { height: 60px; background: linear-gradient(to right, #ff0000, #ff8000, #ffff00, #80ff00, #00ff00, #00ff80, #0080ff, #0000ff, #8000ff); border-radius: 8px; position: relative; cursor: pointer; box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
+        .ph-marker { position: absolute; top: -5px; bottom: -5px; width: 4px; background: black; transform: translateX(-50%); pointer-events: none; }
+        .ph-labels { display: flex; justify-content: space-between; margin-top: 0.5rem; font-size: 0.85rem; color: #666; }
+        .ph-explanation { background: white; padding: 1.2rem; border-radius: 12px; margin-top: 1rem; border-left: 4px solid var(--primary); }
+        .ph-explanation h3 { color: var(--primary); margin-bottom: 0.5rem; }
+        
+        .btn { background: var(--primary); color: white; border: none; padding: 0.8rem 1.8rem; font-size: 1rem; font-weight: bold; border-radius: 50px; cursor: pointer; transition: transform 0.2s; }
+        .btn:hover { transform: scale(1.05); }
+        .btn-submit { width: 100%; padding: 1.1rem; font-size: 1.1rem; margin-top: 1.5rem; }
+        .btn-secondary { background: none; border: none; color: #666; cursor: pointer; font-size: 1rem; margin-top: 1rem; width: 100%; padding: 0.8rem; display: block; }
+        .btn-secondary:hover { color: var(--primary); }
+        .btn-home { background: none; border: 2px solid var(--primary); color: var(--primary); padding: 0.9rem 2rem; font-size: 1rem; font-weight: bold; border-radius: 50px; cursor: pointer; margin-top: 1rem; display: inline-block; }
+        .btn-home:hover { background: var(--primary); color: white; }
+        
+        #map { height: 45vh; border-radius: var(--radius); margin-bottom: 1rem; z-index: 1; }
+        .bottom-panel { display: none; background: white; padding: 1.2rem; border-radius: var(--radius); box-shadow: 0 5px 20px rgba(22, 69, 0, 0.15); justify-content: space-between; align-items: center; }
+        .bottom-panel.show { display: flex; }
+        .coords-display { font-family: monospace; font-size: 1.05rem; color: var(--primary); font-weight: bold; }
+        
+        .warning-banner { background: #ff6b6b; color: white; padding: 0.8rem; text-align: center; border-radius: 8px; margin-bottom: 1rem; display: none; }
+        .warning-banner.show { display: block; }
+        
+        /* РЕЗУЛЬТАТЫ */
+        .results-container, .detail-container { max-width: 900px; margin: 2rem auto; padding: 1.5rem; }
+        .culture-section { background: white; border-radius: var(--radius); padding: 1.5rem; margin-bottom: 2rem; box-shadow: 0 5px 20px rgba(22, 69, 0, 0.1); }
+        .culture-title { color: var(--primary); font-size: 1.6rem; margin-bottom: 1rem; padding-bottom: 0.8rem; border-bottom: 2px solid #d4edda; }
+        .table-wrapper { overflow-x: auto; }
+        table { width: 100%; border-collapse: collapse; min-width: 500px; }
+        th, td { padding: 0.8rem; text-align: left; border-bottom: 1px solid #d4edda; }
+        th { background: rgba(22, 69, 0, 0.05); font-weight: 600; color: var(--primary); }
+        .match-percent { font-weight: bold; color: var(--primary); }
+        .btn-detail { background: var(--primary); color: white; border: none; padding: 0.4rem 1.2rem; border-radius: 50px; cursor: pointer; font-size: 0.85rem; }
+        
+        /* ДЕТАЛИ */
+        .detail-header { background: white; border-radius: var(--radius); padding: 1.5rem; margin-bottom: 1.5rem; box-shadow: 0 5px 20px rgba(22, 69, 0, 0.1); }
+        .detail-title { color: var(--primary); font-size: 1.8rem; margin-bottom: 0.5rem; }
+        .detail-match { font-size: 1.1rem; color: #4a6b40; margin-bottom: 0.8rem; }
+        .detail-taste { font-style: italic; color: #666; padding: 0.8rem; background: rgba(22, 69, 0, 0.05); border-radius: 8px; }
+        .detail-section { background: white; border-radius: var(--radius); padding: 1.5rem; margin-bottom: 1rem; box-shadow: 0 3px 15px rgba(22, 69, 0, 0.08); }
+        .detail-section h2 { color: var(--primary); margin-bottom: 0.8rem; font-size: 1.3rem; }
+        .dates-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.8rem; margin-top: 0.8rem; }
+        .date-item { text-align: center; padding: 0.8rem; background: rgba(22, 69, 0, 0.05); border-radius: 8px; }
+        .date-label { font-size: 0.85rem; color: #666; margin-bottom: 0.3rem; }
+        .date-value { font-size: 1rem; font-weight: bold; color: var(--primary); }
+        
+        .risk-list, .recommendation-list { list-style: none; }
+        .risk-list li, .recommendation-list li { padding: 0.7rem; margin-bottom: 0.4rem; border-radius: 8px; padding-left: 1.3rem; position: relative; }
+        .risk-low { background: rgba(0, 128, 0, 0.1); color: #006400; }
+        .risk-medium { background: rgba(255, 165, 0, 0.1); color: #cc8400; }
+        .risk-high { background: rgba(255, 0, 0, 0.1); color: #cc0000; }
+        .recommendation-list li { background: rgba(22, 69, 0, 0.03); padding-left: 1.8rem; }
+        .recommendation-list li::before { content: "-"; position: absolute; left: 0.7rem; font-weight: bold; color: var(--primary); }
+        
+        .ad-block { background: linear-gradient(135deg, #667eea, #764ba2); color: white; border-radius: var(--radius); padding: 1.5rem; text-align: center; margin-top: 1.5rem; }
+        .ad-block h3 { margin-bottom: 0.8rem; }
+        .ad-block p { margin-bottom: 1rem; opacity: 0.9; }
+        .ad-button { background: white; color: #667eea; border: none; padding: 0.8rem 2rem; border-radius: 50px; font-weight: bold; cursor: pointer; font-size: 1rem; }
+        
+        /* ПОГОДА */
+        .weather-widget { margin-top: 0.5rem; padding: 0.8rem; background: rgba(22, 69, 0, 0.05); border-radius: 8px; font-size: 0.9rem; }
+        .weather-temp { font-size: 1.5rem; font-weight: bold; color: var(--primary); margin: 0.3rem 0; }
+        .forecast-day-mini { background: white; padding: 0.3rem 0.6rem; border-radius: 6px; font-size: 0.85rem; text-align: center; display: inline-block; margin-right: 0.3rem; margin-bottom: 0.3rem; }
+        
+        footer { background: var(--primary); color: var(--bg); text-align: center; padding: 2rem; margin-top: 3rem; }
+        footer h3 { margin-bottom: 0.8rem; }
+        footer p { max-width: 600px; margin: 0 auto; opacity: 0.8; }
+        
+        @media (max-width: 768px) {
+            .hero-title { font-size: 2.5rem; }
+            .hero-subtitle { font-size: 1rem; }
+            .choice-card { height: 50vh; min-height: 350px; padding: 1.5rem; }
+            .card-title { font-size: 1.6rem; }
+            .form-container, .results-container, .detail-container { padding: 1rem; }
+            h1 { font-size: 1.4rem; }
+            .dates-grid { grid-template-columns: 1fr; }
+            header { padding: 0.8rem 1rem; }
+            .logo { font-size: 1.2rem; }
+        }
+    </style>
+</head>
+<body>
+
+<header>
+    <div class="logo" onclick="showScreen('home')">🌱 АгроСенс</div>
+    <div class="hamburger" onclick="toggleMenu()">☰
+        <div class="menu-dropdown" id="menu-dropdown">
+            <div class="menu-item">
+                <div class="menu-label">Ваш участок:</div>
+                <div class="menu-value" id="menu-coords">Не указан</div>
+                <button class="btn" style="font-size: 0.85rem; padding: 0.4rem 1rem; margin-top: 0.5rem;" onclick="editLocation()">Изменить</button>
+            </div>
+            
+            <div class="menu-item" style="border-top: 1px solid #eee;">
+                <div style="display: flex; justify-content: space-between; align-items: center; cursor: pointer;" onclick="toggleWeather()">
+                    <div>
+                        <div class="menu-label">Погода</div>
+                        <div class="menu-value" id="weather-summary" style="font-size: 0.95rem;">Нажмите для загрузки</div>
+                    </div>
+                    <span id="weather-icon" style="font-size: 1.5rem;">🌤</span>
+                </div>
+                
+                <div id="weather-details" style="display: none; margin-top: 1rem; padding-top: 1rem; border-top: 1px solid #eee;">
+                    <div id="weather-loading" style="text-align: center; color: #666; font-size: 0.9rem;">Загрузка...</div>
+                    <div id="weather-content" style="display: none;">
+                        <div class="weather-widget">
+                            <div style="font-size: 0.85rem; color: #666;">Сейчас</div>
+                            <div class="weather-temp" id="current-temp-widget">--°C</div>
+                            <div id="forecast-widget" style="margin-top: 0.5rem;"></div>
+                            <div id="agro-tips-widget" style="margin-top: 0.5rem; padding-top: 0.5rem; border-top: 1px solid #ddd; font-size: 0.85rem;"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="menu-item" id="install-menu-item" style="display: none; border-top: 1px solid #eee;">
+                <div style="display: flex; align-items: center; gap: 10px;">
+                    <span style="font-size: 1.5rem;">📲</span>
+                    <div>
+                        <div style="font-weight: bold; color: var(--primary);">Скачать приложение</div>
+                        <div style="font-size: 0.8rem; color: #666;">Установить на телефон</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</header>
+
+<div class="stepper" id="stepper" style="display: none;">
+    <div class="step" id="step-1"><div class="step-icon">📍</div></div>
+    <div class="step-connector" id="conn-1"></div>
+    <div class="step" id="step-2"><div class="step-icon">🌱</div></div>
+    <div class="step-connector" id="conn-2"></div>
+    <div class="step" id="step-3"><div class="step-icon">📊</div></div>
+</div>
+
+<!-- ЭКРАН 1: ГЛАВНАЯ -->
+<div class="screen active" id="screen-home">
+    <div class="hero">
+        <div class="hero-title">АгроСенс</div>
+        <p class="hero-subtitle">Умный помощник для подбора идеальных культур и сортов для вашего участка</p>
+        <div class="scroll-hint">↓</div>
+    </div>
+    <div class="cards-container">
+        <section class="choice-card bg-1">
+            <h2 class="card-title">🍅 Я знаю, что хочу посадить</h2>
+            <p class="card-desc">Выберите культуру, укажите параметры участка — мы подберём лучшие сорта с точными датами посадки.</p>
+            <button class="btn-start" onclick="startFlow('check')">Начать</button>
+        </section>
+        <section class="choice-card bg-2">
+            <h2 class="card-title">🌱 Подберите мне культуры</h2>
+            <p class="card-desc">Введите координаты и параметры почвы — мы предложим список культур, которые точно вырастут.</p>
+            <button class="btn-start" onclick="startFlow('discover')">Начать</button>
+        </section>
+    </div>
+    <footer>
+        <h3>О проекте</h3>
+        <p>АгроСенс — умный помощник для садоводов. Мы используем данные о климате и почве, чтобы сделать ваше садоводство предсказуемым и урожайным.</p>
+    </footer>
+</div>
+
+<!-- ЭКРАН 2: КАРТА -->
+<div class="screen" id="screen-location">
+    <div class="form-container">
+        <h1>Укажите ваш участок</h1>
+        <div class="warning-banner" id="location-warning">⚠️ Для изменения координат требуется интернет</div>
+        <p style="text-align: center; color: #4a6b40; margin-bottom: 1rem;">Нажмите на карту, чтобы выбрать точку</p>
+        <div id="map"></div>
+        <div class="bottom-panel" id="bottom-panel">
+            <div class="coords-display" id="coords-display">Координаты: --</div>
+            <button class="btn" onclick="saveLocation()">Сохранить</button>
+        </div>
+    </div>
+</div>
+
+<!-- ЭКРАН 3: ПОЧВА -->
+<div class="screen" id="screen-soil">
+    <div class="form-container">
+        <h1>Параметры участка</h1>
+        <div class="form-group" id="crop-group" style="display: none;">
+            <label>Выберите культуру</label>
+            <select id="crop-select">
+                <option value="tomato">Томат</option>
+                <option value="cucumber">Огурец</option>
+                <option value="carrot">Морковь</option>
+                <option value="potato">Картофель</option>
+            </select>
+        </div>
+        <div class="form-group">
+            <label>Тип почвы</label>
+            <select id="soil-type">
+                <option value="loam">Суглинок</option>
+                <option value="sand">Песок</option>
+                <option value="clay">Глина</option>
+                <option value="chernozem">Чернозём</option>
+            </select>
+        </div>
+        <div class="form-group">
+            <label>Уровень pH (нажмите на шкалу)</label>
+            <input type="number" id="ph-input" step="0.5" min="3" max="10" value="6.5" readonly>
+            <div class="ph-scale" id="ph-scale" onclick="handlePhClick(event)">
+                <div class="ph-marker" id="ph-marker" style="left: 50%"></div>
+            </div>
+            <div class="ph-labels">
+                <span>3 (кислая)</span><span>5</span><span>7 (нейтральная)</span><span>9</span><span>10 (щелочная)</span>
+            </div>
+        </div>
+        <div class="ph-explanation">
+            <h3>Зачем нам pH?</h3>
+            <p>Кислотность почвы влияет на то, какие культуры смогут расти. Сравните цвет лакмусовой бумажки со шкалой и нажмите на подходящий оттенок.</p>
+        </div>
+        <button class="btn btn-submit" onclick="calculateAndShow()">Получить рекомендацию</button>
+        <button class="btn-secondary" onclick="showScreen('home')">На главную</button>
+    </div>
+</div>
+
+<!-- ЭКРАН 4: РЕЗУЛЬТАТЫ -->
+<div class="screen" id="screen-results">
+    <div class="results-container">
+        <h1 id="results-title">Результаты</h1>
+        <div id="results-content"></div>
+        <div style="text-align: center; margin-top: 2rem;">
+            <button class="btn-secondary" onclick="showScreen('soil')">Назад</button>
+            <button class="btn-home" onclick="showScreen('home')">На главную</button>
+        </div>
+    </div>
+</div>
+
+<!-- ЭКРАН 5: ДЕТАЛИ -->
+<div class="screen" id="screen-detail">
+    <div class="detail-container">
+        <div class="detail-header">
+            <h1 class="detail-title" id="detail-name">--</h1>
+            <p class="detail-match" id="detail-match">--</p>
+            <p class="detail-taste" id="detail-taste">--</p>
+        </div>
+        <div class="detail-section">
+            <h2>📅 Календарь</h2>
+            <div class="dates-grid">
+                <div class="date-item"><div class="date-label">Посев рассады</div><div class="date-value" id="date-seeding">--</div></div>
+                <div class="date-item"><div class="date-label">Высадка в грунт</div><div class="date-value" id="date-planting">--</div></div>
+                <div class="date-item"><div class="date-label">Сбор урожая</div><div class="date-value" id="date-harvest">--</div></div>
+            </div>
+        </div>
+        <div class="detail-section">
+            <h2>⚠️ Риски</h2>
+            <ul class="risk-list" id="detail-risks"></ul>
+        </div>
+        <div class="detail-section">
+            <h2>💡 Рекомендации</h2>
+            <ul class="recommendation-list" id="detail-recommendations"></ul>
+        </div>
+        <div class="ad-block">
+            <h3>Рекомендуем для этого сорта</h3>
+            <p>Удобрение "АгроМакс" — увеличит урожайность на 30%</p>
+            <button class="ad-button">Подробнее</button>
+        </div>
+        <div style="text-align: center; margin-top: 2rem;">
+            <button class="btn-secondary" onclick="showScreen('results')">Назад к результатам</button>
+            <button class="btn-home" onclick="showScreen('home')">На главную</button>
+        </div>
+    </div>
+</div>
+
+<script>
+// ============================================================
+// БАЗА ДАННЫХ КУЛЬТУР (из Excel axel.xlsx)
+// ============================================================
+const CROPS_DB = {
+    tomato: { 
+        name: "Томат", 
+        ph_min: 6.0, ph_max: 7.0, 
+        frost_sensitive: true, 
+        min_temp: 15, max_temp: 35, 
+        varieties: [
+            {name: "Санька", days: 80, seeding_days: 45, desc: "Раннеспелый, компактный (высота 40–60 см)"},
+            {name: "Бычье сердце", days: 125, seeding_days: 60, desc: "Позднеспелый, крупноплодный (до 400 г)"},
+            {name: "Сливка", days: 105, seeding_days: 45, desc: "Раннеспелый, для консервирования (плоды 30–50 г)"}
+        ]
+    },
+    cucumber: { 
+        name: "Огурец", 
+        ph_min: 6.0, ph_max: 7.0, 
+        frost_sensitive: true, 
+        min_temp: 16, max_temp: 32, 
+        varieties: [
+            {name: "Зозуля", days: 48, seeding_days: 25, desc: "Раннеспелый, преимущественно для теплиц (требует опыления)"},
+            {name: "Кураж", days: 48, seeding_days: 25, desc: "Скороспелый, партенокарпический (не требует опыления)"},
+            {name: "Герман", days: 42, seeding_days: 25, desc: "Ультраранний, партенокарпический (для теплиц и открытого грунта)"}
+        ]
+    },
+    carrot: { 
+        name: "Морковь", 
+        ph_min: 6.0, ph_max: 7.0, 
+        frost_sensitive: false, 
+        min_temp: 8, max_temp: 28, 
+        varieties: [
+            {name: "Королева осени", days: 125, seeding_days: 90, desc: "Позднеспелая, для хранения (сладкая, крупная)"},
+            {name: "Нантская", days: 95, seeding_days: 70, desc: "Среднеспелая, сладкая, сочная"},
+            {name: "Лососиновская", days: 100, seeding_days: 70, desc: "Среднеспелая, с повышенным содержанием каротина"}
+        ]
+    },
+    potato: { 
+        name: "Картофель", 
+        ph_min: 5.0, ph_max: 6.0, 
+        frost_sensitive: true, 
+        min_temp: 10, max_temp: 28, 
+        varieties: [
+            {name: "Ривьера", days: 60, seeding_days: 65, desc: "Ранний, устойчив к болезням"},
+            {name: "Лада", days: 75, seeding_days: 70, desc: "Ранний, устойчив к болезням"},
+            {name: "Пикассо", days: 105, seeding_days: 80, desc: "Среднеранний, устойчив к болезням"}
+        ]
+    }
+};
+
+// ============================================================
+// СОСТОЯНИЕ ПРИЛОЖЕНИЯ
+// ============================================================
+let currentMode = 'check';
+let map = null, mapMarker = null;
+let savedCoords = JSON.parse(localStorage.getItem('agrosens_coords')) || null;
+let pendingMode = null;
+let weatherExpanded = false;
+
+// ============================================================
+// НАВИГАЦИЯ
+// ============================================================
+function showScreen(id) {
+    document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+    document.getElementById('screen-' + id).classList.add('active');
+    updateStepper(id);
+    if (id === 'location') setTimeout(initMap, 200);
+    window.scrollTo(0, 0);
+    closeMenu();
+}
+
+function updateStepper(id) {
+    const stepper = document.getElementById('stepper');
+    if (['home', 'results', 'detail'].includes(id)) { 
+        stepper.style.display = 'none'; 
+        return; 
+    }
+    stepper.style.display = 'flex';
+    document.querySelectorAll('.step, .step-connector').forEach(el => el.classList.remove('active'));
+    if (id === 'location') document.getElementById('step-1').classList.add('active');
+    if (id === 'soil') {
+        document.getElementById('step-1').classList.add('active');
+        document.getElementById('step-2').classList.add('active');
+        document.getElementById('conn-1').classList.add('active');
+    }
+}
+
+function startFlow(mode) {
+    currentMode = mode;
+    document.getElementById('crop-group').style.display = (mode === 'check') ? 'block' : 'none';
+    
+    if (!savedCoords) {
+        pendingMode = mode;
+        showScreen('location');
+    } else {
+        showScreen('soil');
+    }
+}
+
+// ============================================================
+// МЕНЮ
+// ============================================================
+function toggleMenu() {
+    document.getElementById('menu-dropdown').classList.toggle('show');
+    updateMenuCoords();
+}
+function closeMenu() { 
+    document.getElementById('menu-dropdown').classList.remove('show'); 
+}
+function updateMenuCoords() {
+    document.getElementById('menu-coords').textContent = savedCoords 
+        ? `${savedCoords.lat.toFixed(4)}, ${savedCoords.lon.toFixed(4)}` 
+        : 'Не указан';
+}
+
+function editLocation() {
+    if (!navigator.onLine) {
+        const w = document.getElementById('location-warning');
+        w.classList.add('show');
+        setTimeout(() => w.classList.remove('show'), 3000);
+        return;
+    }
+    closeMenu();
+    pendingMode = currentMode;
+    showScreen('location');
+}
+
+// ============================================================
+// КАРТА
+// ============================================================
+function initMap() {
+    if (map) { map.invalidateSize(); return; }
+    const center = savedCoords ? [savedCoords.lat, savedCoords.lon] : [55.7558, 37.6173];
+    map = L.map('map').setView(center, savedCoords ? 13 : 5);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '© OpenStreetMap'
+    }).addTo(map);
+    
+    if (savedCoords) {
+        mapMarker = L.marker([savedCoords.lat, savedCoords.lon]).addTo(map);
+        document.getElementById('bottom-panel').classList.add('show');
+        document.getElementById('coords-display').textContent = 
+            `${savedCoords.lat.toFixed(4)}, ${savedCoords.lon.toFixed(4)}`;
+    }
+    
+    map.on('click', function(e) {
+        if (mapMarker) map.removeLayer(mapMarker);
+        mapMarker = L.marker(e.latlng).addTo(map);
+        document.getElementById('bottom-panel').classList.add('show');
+        document.getElementById('coords-display').textContent = 
+            `${e.latlng.lat.toFixed(4)}, ${e.latlng.lng.toFixed(4)}`;
+    });
+}
+
+function saveLocation() {
+    if (!mapMarker) return;
+    const latlng = mapMarker.getLatLng();
+    savedCoords = { lat: latlng.lat, lon: latlng.lng };
+    localStorage.setItem('agrosens_coords', JSON.stringify(savedCoords));
+    updateMenuCoords();
+    const mode = pendingMode || currentMode;
+    showScreen('soil');
+}
+
+// ============================================================
+// pH ШКАЛА
+// ============================================================
+function handlePhClick(event) {
+    const scale = document.getElementById('ph-scale');
+    const rect = scale.getBoundingClientRect();
+    const percent = Math.max(0, Math.min(1, (event.clientX - rect.left) / rect.width));
+    const ph = (3 + (percent * 7)).toFixed(1);
+    document.getElementById('ph-marker').style.left = (percent * 100) + '%';
+    document.getElementById('ph-input').value = ph;
+}
+
+// ============================================================
+// КЛИМАТИЧЕСКАЯ ЗОНА (офлайн-расчёт по широте)
+// ============================================================
+function getClimateZone(lat) {
+    if (lat < 45) return { zone: "Юг", lastFrost: new Date(2026, 3, 15), days: 180, avgTemp: 22 };
+    if (lat < 56) return { zone: "Средняя полоса", lastFrost: new Date(2026, 4, 15), days: 125, avgTemp: 18 };
+    return { zone: "Сибирь/Север", lastFrost: new Date(2026, 5, 1), days: 90, avgTemp: 14 };
+}
+
+// ============================================================
+// РАСЧЁТ ДАТ
+// ============================================================
+function calculateDates(variety, climate) {
+    const planting = new Date(climate.lastFrost);
+    planting.setDate(planting.getDate() + 10);
+    const seeding = new Date(planting);
+    seeding.setDate(seeding.getDate() - variety.seeding_days);
+    const harvest = new Date(planting);
+    harvest.setDate(harvest.getDate() + variety.days);
+    
+    const months = ["января", "февраля", "марта", "апреля", "мая", "июня", 
+                    "июля", "августа", "сентября", "октября", "ноября", "декабря"];
+    return {
+        seeding: `${seeding.getDate()} ${months[seeding.getMonth()]}`,
+        planting: `${planting.getDate()} ${months[planting.getMonth()]}`,
+        harvest: `${harvest.getDate()} ${months[harvest.getMonth()]}`
+    };
+}
+
+// ============================================================
+// ПРОВЕРКА СОРТА НА СООТВЕТСТВИЕ ВСЕМ ПАРАМЕТРАМ
+// ============================================================
+function isVarietySuitable(crop, variety, ph, climate) {
+    const phOk = ph >= crop.ph_min && ph <= crop.ph_max;
+    const daysOk = variety.days <= climate.days;
+    const tempOk = climate.avgTemp >= crop.min_temp;
+    return phOk && daysOk && tempOk;
+}
+
+// ============================================================
+// ГЛАВНЫЙ РАСЧЁТ
+// ============================================================
+function calculateAndShow() {
+    const ph = parseFloat(document.getElementById('ph-input').value);
+    const soil = document.getElementById('soil-type').value;
+    const cropKey = document.getElementById('crop-select').value;
+    const lat = savedCoords ? savedCoords.lat : 55.75;
+    const climate = getClimateZone(lat);
+    
+    const content = document.getElementById('results-content');
+    const title = document.getElementById('results-title');
+    
+    if (currentMode === 'discover') {
+        // Режим "Подберите мне культуры" — показываем только подходящие культуры и сорта
+        title.textContent = `Подходящие культуры: ${climate.zone}`;
+        let html = '';
+        for (let key in CROPS_DB) {
+            const c = CROPS_DB[key];
+            // Фильтр по pH и температуре на уровне культуры
+            if (ph >= c.ph_min && ph <= c.ph_max && climate.avgTemp >= c.min_temp) {
+                // Фильтр по дням на уровне сортов
+                const suitable = c.varieties.filter(v => v.days <= climate.days);
+                if (suitable.length > 0) {
+                    html += `<div class="culture-section">
+                        <h2 class="culture-title">${c.name}</h2>
+                        <div class="table-wrapper"><table>
+                            <tr><th>Сорт</th><th>Дней</th><th>Описание</th><th></th></tr>`;
+                    suitable.forEach(v => {
+                        html += `<tr>
+                            <td>${v.name}</td>
+                            <td class="match-percent">${v.days}</td>
+                            <td>${v.desc}</td>
+                            <td><button class="btn-detail" onclick="showDetail('${key}', '${v.name}', '${soil}', ${lat})">Подробнее</button></td>
+                        </tr>`;
+                    });
+                    html += `</table></div></div>`;
+                }
+            }
+        }
+        content.innerHTML = html || '<p style="text-align:center; padding: 2rem;">Подходящих культур не найдено. Попробуйте изменить pH.</p>';
+        
+    } else {
+        // Режим "Я знаю, что хочу посадить" — показываем ТОЛЬКО подходящие сорта
+        const c = CROPS_DB[cropKey];
+        title.textContent = `Результат для: ${c.name}`;
+        
+        // Фильтруем только подходящие сорта по ВСЕМ параметрам
+        const suitable = c.varieties.filter(v => isVarietySuitable(c, v, ph, climate));
+        
+        if (suitable.length === 0) {
+            // Ни один сорт не подходит — показываем причины
+            let reasons = [];
+            if (ph < c.ph_min || ph > c.ph_max) {
+                reasons.push(`pH ${ph} не подходит (нужно ${c.ph_min}–${c.ph_max})`);
+            }
+            if (climate.avgTemp < c.min_temp) {
+                reasons.push(`Средняя температура ${climate.avgTemp}°C ниже минимальной (${c.min_temp}°C)`);
+            }
+            const minDays = Math.min(...c.varieties.map(v => v.days));
+            if (minDays > climate.days) {
+                reasons.push(`Минимальный срок созревания ${minDays} дней больше доступных ${climate.days}`);
+            }
+            
+            content.innerHTML = `
+                <div class="culture-section" style="text-align: center; padding: 2rem;">
+                    <h2 style="color: #cc0000; margin-bottom: 1rem;">⚠️ Нет подходящих сортов</h2>
+                    <p style="font-size: 1.1rem; margin-bottom: 1.5rem;">
+                        К сожалению, для культуры "${c.name}" в вашем регионе нет сортов, которые подойдут по всем параметрам.
+                    </p>
+                    <div style="background: rgba(255,0,0,0.05); padding: 1rem; border-radius: 8px; margin-bottom: 1.5rem; text-align: left;">
+                        <strong>Причины:</strong>
+                        <ul style="list-style: none; padding: 0; margin-top: 0.5rem;">
+                            ${reasons.map(r => `<li style="margin-bottom: 0.5rem;">❌ ${r}</li>`).join('')}
+                        </ul>
+                    </div>
+                    <p style="color: #666; margin-bottom: 0.5rem;">Попробуйте:</p>
+                    <ul style="list-style: none; padding: 0; text-align: left; display: inline-block;">
+                        <li style="margin-bottom: 0.5rem;">• Изменить уровень pH</li>
+                        <li style="margin-bottom: 0.5rem;">• Выращивать в теплице</li>
+                        <li style="margin-bottom: 0.5rem;">• Выбрать другую культуру в режиме "Подберите мне культуры"</li>
+                    </ul>
+                </div>
+            `;
+        } else {
+            // Показываем только подходящие сорта
+            let html = `<div class="culture-section">
+                <div style="background: rgba(0,128,0,0.1); padding: 1rem; border-radius: 8px; margin-bottom: 1rem;">
+                    ✅ Найдено подходящих сортов: <b>${suitable.length}</b> из ${c.varieties.length}
+                </div>
+                <div class="table-wrapper"><table>
+                    <tr><th>Сорт</th><th>Дней</th><th>Описание</th><th></th></tr>`;
+            suitable.forEach(v => {
+                html += `<tr>
+                    <td>${v.name}</td>
+                    <td class="match-percent">${v.days}</td>
+                    <td>${v.desc}</td>
+                    <td><button class="btn-detail" onclick="showDetail('${cropKey}', '${v.name}', '${soil}', ${lat})">Подробнее</button></td>
+                </tr>`;
+            });
+            html += `</table></div></div>`;
+            content.innerHTML = html;
+        }
+    }
+    showScreen('results');
+}
+
+// ============================================================
+// ДЕТАЛЬНАЯ КАРТОЧКА
+// ============================================================
+function showDetail(cropKey, varietyName, soil, lat) {
+    const c = CROPS_DB[cropKey];
+    const v = c.varieties.find(x => x.name === varietyName);
+    const climate = getClimateZone(lat);
+    const dates = calculateDates(v, climate);
+    const ph = parseFloat(document.getElementById('ph-input').value);
+    const canGrow = isVarietySuitable(c, v, ph, climate);
+    
+    document.getElementById('detail-name').textContent = `${c.name} "${v.name}"`;
+    document.getElementById('detail-match').textContent = canGrow 
+        ? `✅ Подходит для ${climate.zone} (${climate.days} дней доступно)` 
+        : `️ Не подходит по одному из параметров`;
+    document.getElementById('detail-taste').textContent = v.desc;
+    
+    document.getElementById('date-seeding').textContent = dates.seeding;
+    document.getElementById('date-planting').textContent = dates.planting;
+    document.getElementById('date-harvest').textContent = dates.harvest;
+    
+    // Риски
+    let risksHtml = '';
+    if (ph >= c.ph_min && ph <= c.ph_max) {
+        risksHtml += `<li class="risk-low">✅ Уровень pH в норме</li>`;
+    } else {
+        risksHtml += `<li class="risk-high">⚠️ pH не подходит для этой культуры</li>`;
+    }
+    if (c.frost_sensitive) {
+        risksHtml += `<li class="risk-medium">⚠️ Чувствителен к заморозкам — используйте укрывной материал</li>`;
+    }
+    if (climate.avgTemp < c.min_temp) {
+        risksHtml += `<li class="risk-high">⚠️ Средняя температура ниже минимальной (${c.min_temp}°C). Рассмотрите теплицу.</li>`;
+    }
+    if (v.days > climate.days) {
+        risksHtml += `<li class="risk-high"> Сорт не успеет вызреть в вашем климате</li>`;
+    }
+    document.getElementById('detail-risks').innerHTML = risksHtml;
+    
+    // Рекомендации
+    let recsHtml = '<li>Регулярно рыхлите почву после полива</li><li>Вносите удобрения каждые 2 недели</li>';
+    if (soil === 'clay') recsHtml += '<li>🪨 Глина: добавьте песок и компост (10-15 кг/м²)</li>';
+    else if (soil === 'sand') recsHtml += '<li>🏖️ Песок: частый полив + перегной (5-7 кг/м²)</li>';
+    else if (soil === 'chernozem') recsHtml += '<li>🌟 Чернозём: идеальная почва, дополнительное удобрение не требуется</li>';
+    document.getElementById('detail-recommendations').innerHTML = recsHtml;
+    
+    showScreen('detail');
+}
+
+// ============================================================
+// ПОГОДА (Open-Meteo API)
+// ============================================================
+function toggleWeather() {
+    weatherExpanded = !weatherExpanded;
+    document.getElementById('weather-details').style.display = weatherExpanded ? 'block' : 'none';
+    if (weatherExpanded && savedCoords) {
+        loadWeather();
+    }
+}
+
+async function loadWeather() {
+    const loading = document.getElementById('weather-loading');
+    const content = document.getElementById('weather-content');
+    const summary = document.getElementById('weather-summary');
+    const icon = document.getElementById('weather-icon');
+    
+    loading.style.display = 'block';
+    content.style.display = 'none';
+    
+    if (!savedCoords) {
+        loading.textContent = 'Сначала укажите участок';
+        summary.textContent = '—';
+        return;
+    }
+    
+    const lat = savedCoords.lat;
+    const lon = savedCoords.lon;
+    
+    try {
+        const url = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=temperature_2m,weather_code&daily=temperature_2m_max,temperature_2m_min,precipitation_sum&timezone=auto&forecast_days=3`;
+        
+        const response = await fetch(url);
+        if (!response.ok) throw new Error('API error');
+        
+        const data = await response.json();
+        
+        const currentTemp = Math.round(data.current.temperature_2m);
+        document.getElementById('current-temp-widget').textContent = `${currentTemp}°C`;
+        summary.textContent = `${currentTemp}°C`;
+        
+        let weatherIcon = '🌤';
+        if (data.current.weather_code > 50) weatherIcon = '🌧';
+        else if (data.current.weather_code > 20) weatherIcon = '☁️';
+        icon.textContent = weatherIcon;
+        
+        const forecastWidget = document.getElementById('forecast-widget');
+        forecastWidget.innerHTML = '<div style="font-size: 0.85rem; color: #666; margin-bottom: 0.3rem;">Прогноз:</div>';
+        for (let i = 0; i < 3; i++) {
+            const date = new Date(data.daily.time[i]).toLocaleDateString('ru-RU', { weekday: 'short', day: 'numeric' });
+            const maxT = Math.round(data.daily.temperature_2m_max[i]);
+            const minT = Math.round(data.daily.temperature_2m_min[i]);
+            const rain = data.daily.precipitation_sum[i];
+            forecastWidget.innerHTML += `<div class="forecast-day-mini">${date}: ${minT}°...${maxT}°${rain > 0 ? ' 🌧' : ''}</div>`;
+        }
+        
+        const tipsWidget = document.getElementById('agro-tips-widget');
+        let tips = [];
+        for (let i = 0; i < 3; i++) {
+            if (data.daily.temperature_2m_min[i] < 2) {
+                tips.push('⚠️ Возможны заморозки');
+                break;
+            }
+        }
+        for (let i = 0; i < 3; i++) {
+            if (data.daily.precipitation_sum[i] > 5) {
+                tips.push('🌧 Ожидается дождь');
+                break;
+            }
+        }
+        if (tips.length === 0) tips.push('✅ Благоприятные условия');
+        tipsWidget.innerHTML = tips.join(', ');
+        
+        loading.style.display = 'none';
+        content.style.display = 'block';
+        
+    } catch (error) {
+        console.error('Weather error:', error);
+        loading.style.display = 'none';
+        summary.textContent = 'Нет данных';
+        content.style.display = 'block';
+        document.getElementById('current-temp-widget').textContent = '—';
+        document.getElementById('forecast-widget').innerHTML = '<div style="color: #999; font-size: 0.85rem;">Прогноз недоступен<br><small>Работает на HTTPS (Netlify)</small></div>';
+        document.getElementById('agro-tips-widget').innerHTML = 'ℹ️ Климатическая зона определена по координатам';
+    }
+}
+
+// ============================================================
+// PWA УСТАНОВКА
+// ============================================================
+let deferredPrompt;
+const installMenuItem = document.getElementById('install-menu-item');
+
+window.addEventListener('beforeinstallprompt', (e) => {
+    e.preventDefault();
+    deferredPrompt = e;
+    installMenuItem.style.display = 'block';
+});
+
+installMenuItem.addEventListener('click', async () => {
+    if (deferredPrompt) {
+        deferredPrompt.prompt();
+        const { outcome } = await deferredPrompt.userChoice;
+        if (outcome === 'accepted') installMenuItem.style.display = 'none';
+        deferredPrompt = null;
+    } else {
+        alert('Чтобы установить приложение:\n\n• Android (Chrome): меню → "Установить приложение"\n• iPhone (Safari): "Поделиться" → "На экран Домой"');
+    }
+});
+
+window.addEventListener('appinstalled', () => {
+    installMenuItem.style.display = 'none';
+    deferredPrompt = null;
+});
+
+// Закрытие меню при клике вне
+document.addEventListener('click', function(event) {
+    if (!document.querySelector('.hamburger').contains(event.target)) closeMenu();
+});
+
+// Инициализация
+updateMenuCoords();
+
+// Регистрация Service Worker
+if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.register('sw.js').catch(() => {});
+}
+</script>
+
+</body>
+</html>
